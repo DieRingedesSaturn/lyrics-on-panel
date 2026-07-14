@@ -8,6 +8,7 @@ import org.kde.plasma.plasmoid 2.0
 import org.kde.plasma.components 3.0 as PlasmaComponents
 import org.kde.plasma.plasma5support as Plasma5Support
 import org.kde.plasma.private.mpris as Mpris
+import org.kde.kirigami 2.20 as Kirigami
 
 
 /**
@@ -50,7 +51,7 @@ PlasmoidItem {
     Text {
         id: lyricText
         text: ""
-        color: config_lyricTextColor
+        color: effectiveLyricTextColor
         font.pixelSize: config_lyricTextSize
         font.bold: config_lyricTextBold
         font.italic: config_lyricTextItalic
@@ -131,11 +132,7 @@ PlasmoidItem {
             MouseArea {
                 anchors.fill: parent
                 onClicked: {
-                    if (liked) {
-                        liked = false;
-                    } else {
-                        liked = true;
-                    }
+                    toggleFavorite();
                 }
             }
         }
@@ -145,7 +142,7 @@ PlasmoidItem {
             source: {
                 if (config_yesPlayMusicChecked) {
                     return cloudMusicIcon;
-                } else if (config_splayerChecked) {
+                } else if (config_splayerChecked || config_splayerNextChecked) {
                     return splayerIcon;
                 } else {
                     return spotifyIcon;
@@ -177,21 +174,22 @@ PlasmoidItem {
     }
 
     // UI-Resources related configurations
-    property string backwardIcon: config_whiteMediaControlIconsChecked ? "../assets/media-backward-white.svg" : "../assets/media-backward.svg"
-    property string pauseIcon: config_whiteMediaControlIconsChecked ? "../assets/media-pause-white.svg" : "../assets/media-pause.svg"
-    property string forwardIcon: config_whiteMediaControlIconsChecked ? "../assets/media-forward-white.svg" : "../assets/media-forward.svg"
-    property string likeIcon: config_whiteMediaControlIconsChecked ? "../assets/media-like-white.svg" : "../assets/media-like.svg"
+    property string backwardIcon: useWhiteMediaControlIcons ? "../assets/media-backward-white.svg" : "../assets/media-backward.svg"
+    property string pauseIcon: useWhiteMediaControlIcons ? "../assets/media-pause-white.svg" : "../assets/media-pause.svg"
+    property string forwardIcon: useWhiteMediaControlIcons ? "../assets/media-forward-white.svg" : "../assets/media-forward.svg"
+    property string likeIcon: useWhiteMediaControlIcons ? "../assets/media-like-white.svg" : "../assets/media-like.svg"
     property string likedIcon: "../assets/media-liked.svg"
     property string splayerIcon: "../assets/splayer.svg"
-    property string cloudMusicIcon: config_whiteMediaControlIconsChecked ? "../assets/netease-cloud-music-white.svg" : "../assets/netease-cloud-music.svg"
-    property string spotifyIcon: config_whiteMediaControlIconsChecked ? "../assets/spotify-white.svg" : "../assets/spotify.svg"
-    property string playIcon: config_whiteMediaControlIconsChecked ? "../assets/media-play-white.svg" : "../assets/media-play.svg"
+    property string cloudMusicIcon: useWhiteMediaControlIcons ? "../assets/netease-cloud-music-white.svg" : "../assets/netease-cloud-music.svg"
+    property string spotifyIcon: useWhiteMediaControlIcons ? "../assets/spotify-white.svg" : "../assets/spotify.svg"
+    property string playIcon: useWhiteMediaControlIcons ? "../assets/media-play-white.svg" : "../assets/media-play.svg"
     property bool liked: false;
 
     // Applet UI behavior configuration
     property bool config_yesPlayMusicChecked: Plasmoid.configuration.yesPlayMusicChecked;
     property bool config_lxMusicChecked: Plasmoid.configuration.lxMusicChecked;
     property bool config_splayerChecked: Plasmoid.configuration.splayerChecked;
+    property bool config_splayerNextChecked: Plasmoid.configuration.splayerNextChecked;
     property bool config_spotifyChecked: Plasmoid.configuration.spotifyChecked;
     property bool config_compatibleModeChecked: Plasmoid.configuration.compatibleModeChecked;
 
@@ -206,10 +204,14 @@ PlasmoidItem {
     property int config_mediaControllItemVerticalOffset: Plasmoid.configuration.mediaControllItemVerticalOffset;
 
     property int config_whiteMediaControlIconsChecked: Plasmoid.configuration.whiteMediaControlIconsChecked;
+    property bool config_followSystemColorSchemeChecked: Plasmoid.configuration.followSystemColorSchemeChecked;
+    property color effectiveLyricTextColor: config_followSystemColorSchemeChecked ? Kirigami.Theme.textColor : config_lyricTextColor
+    property bool useWhiteMediaControlIcons: config_followSystemColorSchemeChecked ? isLightColor(Kirigami.Theme.textColor) : config_whiteMediaControlIconsChecked
     property int config_preferedWidgetWidth: Plasmoid.configuration.preferedWidgetWidth;
     property bool config_hideItemWhenNoControlChecked: Plasmoid.configuration.hideItemWhenNoControlChecked;
 
     property int config_lxMusicPort: Plasmoid.configuration.lxMusicPort;
+    property int config_splayerNextPort: Plasmoid.configuration.splayerNextPort;
 
     /**
     ===============================================================================================================================================================================
@@ -227,20 +229,30 @@ PlasmoidItem {
     */
     Timer {
         id: positionTimer
-        interval: 1
+        interval: 100
         running: true
         repeat: true
         onTriggered: {
-            mpris2Model.currentPlayer.updatePosition();
+            var player = mpris2Model.currentPlayer;
+            if (player) {
+                player.updatePosition();
+            }
         }
     }
 
     Timer {
         id: schedulerTimer
-        interval: 1
+        interval: 100
         running: true
         repeat: true
         onTriggered: {
+            if (!currentMediaTitle && !currentMediaArtists) {
+                if ((previousMediaTitle || previousMediaArtists) && !metadataClearTimer.running) {
+                    metadataClearTimer.start();
+                }
+                return;
+            }
+            metadataClearTimer.stop();
             //log();
             /**
                 Use translator if you don't understand the comment... Too lazy to rewrite it in English.
@@ -254,7 +266,6 @@ PlasmoidItem {
                 重置后，重新判断当前预期的播放器是哪个。并且开启对应的timer（线程）
             */ 
             if (
-                !currentMediaTitle && !currentMediaArtists ||
                 mpris2PreviousPlayerIdentity != mpris2CurrentPlayerIdentity ||
                 prevExpectedPlayerIdentity != currExpectedPlayerIdentity ||
                 currentMediaTitle != previousMediaTitle || 
@@ -275,7 +286,24 @@ PlasmoidItem {
                     if (mpris2CurrentPlayerIdentity === "SPlayer") {
                         splayerTimer.start();
                     }
+                } else if (currExpectedPlayerIdentity === "SPlayer-Next") {
+                    if (mpris2CurrentPlayerIdentity === "SPlayer-Next") {
+                        splayerNextTimer.start();
+                        favoriteStateTimer.start();
+                    }
                 }
+            }
+        }
+    }
+
+    Timer {
+        id: metadataClearTimer
+        interval: 1000
+        repeat: false
+        onTriggered: {
+            if (!currentMediaTitle && !currentMediaArtists) {
+                reset();
+                lyricText.text = " ";
             }
         }
     }
@@ -313,6 +341,30 @@ PlasmoidItem {
             splayerHandler();
         }
     }
+
+    Timer {
+        id: splayerNextTimer
+        interval: 500
+        running: false
+        repeat: true
+        onTriggered: splayerNextHandler()
+    }
+
+    Timer {
+        id: favoriteStateTimer
+        interval: 1000
+        running: false
+        repeat: true
+        onTriggered: fetchFavoriteState()
+    }
+
+    Timer {
+        id: favoriteRefreshTimer
+        interval: 350
+        running: false
+        repeat: false
+        onTriggered: fetchFavoriteState()
+    }
     
     /**
         Same as above, only one Lyric Fetching Timer will be running.
@@ -327,7 +379,7 @@ PlasmoidItem {
     */
     Timer {
         id: compatibleModeTimer
-        interval: 200
+        interval: 500
         running: false
         repeat: true
         onTriggered: {
@@ -345,6 +397,11 @@ PlasmoidItem {
                 } else if (mpris2CurrentPlayerIdentity === "SPlayer") {
                     // console.log("splayer triggered")
                     splayerHandler();
+                } else if (mpris2CurrentPlayerIdentity === "SPlayer-Next") {
+                    splayerNextHandler();
+                    if (!favoriteStateTimer.running) {
+                        favoriteStateTimer.start();
+                    }
                 } else {
                     if (!isCompatibleLRCFound || needFallback) {
                         //console.log("spotify compatible mode triggered")
@@ -357,7 +414,7 @@ PlasmoidItem {
 
     Timer {
         id: lyricDisplayTimer
-        interval: 1
+        interval: 50
         running: false
         repeat: true
         onTriggered: { 
@@ -395,6 +452,10 @@ PlasmoidItem {
 
     readonly property string splayer_base_url: "http://localhost:25884"
 
+    readonly property string splayer_next_base_url: {
+        return "http://127.0.0.1:" + config_splayerNextPort;
+    }
+
     readonly property string lrclib_base_url: "https://lrclib.net"
 
     // Successfully fetched the lyrics from the yesplaymusic API?
@@ -403,6 +464,22 @@ PlasmoidItem {
     property bool isLXLyricFound: false;
 
     property bool isSPlayerLyricFound: false;
+
+    property bool isSPlayerNextLyricFound: false;
+
+    property bool compatibleRequestInFlight: false;
+
+    property int compatibleRequestId: 0;
+
+    property bool splayerRequestInFlight: false;
+
+    property int splayerRequestId: 0;
+
+    property bool splayerNextRequestInFlight: false;
+
+    property int splayerNextRequestId: 0;
+
+    property bool favoriteRequestInFlight: false;
 
     // Current Media Title (Song's name), default is empty string
     property string currentMediaTitle: mpris2Model.currentPlayer?.track ?? ""
@@ -487,6 +564,8 @@ PlasmoidItem {
             return "lx-music-desktop";
         } else if (config_splayerChecked) {
             return "SPlayer";
+        } else if (config_splayerNextChecked) {
+            return "SPlayer-Next";
         } else {
             return "compatible";
         }
@@ -596,16 +675,30 @@ PlasmoidItem {
     }
 
     function fetchMediaInfoSP() {
+        if (splayerRequestInFlight) {
+            return;
+        }
+        splayerRequestInFlight = true;
+        var requestId = ++splayerRequestId;
+        var requestTitle = currentMediaTitle;
+        var requestArtists = currentMediaArtists;
         var xhr = new XMLHttpRequest();
         xhr.open("GET", splayer_base_url + "/api/control/song-info");
         xhr.onreadystatechange = function() {
-            if (xhr.status === 200 && xhr.readyState === XMLHttpRequest.DONE) {
+            if (xhr.readyState !== XMLHttpRequest.DONE || requestId !== splayerRequestId) {
+                return;
+            }
+            splayerRequestInFlight = false;
+            if (requestTitle !== currentMediaTitle || requestArtists !== currentMediaArtists) {
+                return;
+            }
+            if (xhr.status === 200) {
                 var response = JSON.parse(xhr.responseText);
-                if (response && response.data && !response.data.lyricLoading) {
+                if (response && response.data && !response.data.lyricLoading && response.data.lrcData) {
                     parseSyncLyricSP(response.data.lrcData);
-                } else {
-                    lyricsWTimes.clear();
+                } else if (response && response.data && !response.data.lyricLoading) {
                     lyricText.text = lrc_not_exists;
+                    isSPlayerLyricFound = true;
                 }
             }
         };
@@ -636,6 +729,112 @@ PlasmoidItem {
             lyricText.text = lrc_not_exists;
         }
         isSPlayerLyricFound = true;
+    }
+
+    function fetchMediaInfoSPlayerNext() {
+        if (splayerNextRequestInFlight) {
+            return;
+        }
+        splayerNextRequestInFlight = true;
+        var requestId = ++splayerNextRequestId;
+        var requestTitle = currentMediaTitle;
+        var requestArtists = currentMediaArtists;
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", splayer_next_base_url + "/api/now-playing");
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== XMLHttpRequest.DONE || requestId !== splayerNextRequestId) {
+                return;
+            }
+            splayerNextRequestInFlight = false;
+            if (requestTitle !== currentMediaTitle || requestArtists !== currentMediaArtists) {
+                return;
+            }
+            if (xhr.status === 200 && xhr.responseText) {
+                var response = JSON.parse(xhr.responseText);
+                if (!response.track || response.track.title !== requestTitle) {
+                    return;
+                }
+                if (response.lyric && response.lyric.length > 0) {
+                    parseSPlayerNextLyric(response.lyric);
+                } else {
+                    lyricText.text = lrc_not_exists;
+                    isSPlayerNextLyricFound = true;
+                }
+                if (typeof response.liked === "boolean") {
+                    liked = response.liked;
+                }
+            }
+        };
+        xhr.send();
+    }
+
+    function parseSPlayerNextLyric(lyricLines) {
+        var parsed = [];
+        for (var i = 0; i < lyricLines.length; i++) {
+            var line = lyricLines[i];
+            if (!line || line.isBG || !line.words || line.words.length === 0) {
+                continue;
+            }
+            var text = "";
+            for (var j = 0; j < line.words.length; j++) {
+                text += line.words[j].word || "";
+            }
+            text = text.trim();
+            if (text !== "") {
+                // SPlayer-Next 使用毫秒，MPRIS/本组件内部使用微秒。
+                parsed.push({ time: Number(line.startTime) * 1000, lyric: text });
+            }
+        }
+        if (parsed.length === 0) {
+            lyricText.text = lrc_not_exists;
+        } else {
+            lyricsWTimes.clear();
+            prevNonEmptyLyric = "";
+            for (var k = 0; k < parsed.length; k++) {
+                lyricsWTimes.append(parsed[k]);
+            }
+            lyricsWTimes.append({ time: length, lyric: "" });
+            lyricDisplayTimer.start();
+        }
+        isSPlayerNextLyricFound = true;
+    }
+
+    function fetchFavoriteState() {
+        if (mpris2CurrentPlayerIdentity !== "SPlayer-Next" || favoriteRequestInFlight) {
+            return;
+        }
+        favoriteRequestInFlight = true;
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", splayer_next_base_url + "/api/favorite");
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== XMLHttpRequest.DONE) {
+                return;
+            }
+            favoriteRequestInFlight = false;
+            if (xhr.status === 200 && xhr.responseText) {
+                var response = JSON.parse(xhr.responseText);
+                if (typeof response.liked === "boolean") {
+                    liked = response.liked;
+                }
+            }
+        };
+        xhr.send();
+    }
+
+    function toggleFavorite() {
+        if (mpris2CurrentPlayerIdentity !== "SPlayer-Next") {
+            return;
+        }
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", splayer_next_base_url + "/api/favorite");
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                // 收藏可能需要访问在线服务，以播放器随后回传的实际状态为准。
+                favoriteRefreshTimer.restart();
+            }
+        };
+        xhr.send(JSON.stringify({ liked: !liked }));
     }
 
 
@@ -689,18 +888,28 @@ PlasmoidItem {
 
     */
     function fetchLyricsCompatibleMode() {
-        if (currentMediaTitle === "Advertisement" || isCompatibleLRCFound) {
+        if (currentMediaTitle === "Advertisement" || isCompatibleLRCFound || compatibleRequestInFlight) {
             return;
         }
 
+        compatibleRequestInFlight = true;
+        var requestId = ++compatibleRequestId;
+        var requestTitle = currentMediaTitle;
+        var requestArtists = currentMediaArtists;
         var xhr = new XMLHttpRequest();
         xhr.open("GET", lrcQueryUrl);
         xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+            if (xhr.readyState !== XMLHttpRequest.DONE || requestId !== compatibleRequestId) {
+                return;
+            }
+            compatibleRequestInFlight = false;
+            if (requestTitle !== currentMediaTitle || requestArtists !== currentMediaArtists) {
+                return;
+            }
+            if (xhr.status === 200) {
                 if (!xhr.responseText || xhr.responseText === "[]") {
                     needFallback = true;
                     previousLrcId = Number.MIN_VALUE;
-                    lyricsWTimes.clear();
                     lyricText.text = lrc_not_exists;
                 } else {
                     var response = JSON.parse(xhr.responseText);
@@ -714,22 +923,26 @@ PlasmoidItem {
                             {"id":18131162,"name":"Jar Of Love","trackName":"Jar Of Love","artistName":"Wanting 曲婉婷","albumName":"Everything In The World","duration":229.026667, xxxx}
                         ]
                     */
+                    var lyricFound = false;
                     for (var i = 0; i < response.length; i++) {
                         var responseItem = response[i]
                         if (previousLrcId !== responseItem.id.toString()) {
                             if (responseItem.syncedLyrics) {
-                                reset()
+                                lyricsWTimes.clear();
+                                prevNonEmptyLyric = "";
                                 previousLrcId = responseItem.id.toString();
                                 isCompatibleLRCFound = true;
                                 parseLyric(responseItem.syncedLyrics);
+                                lyricFound = true;
                                 break;
                             } 
                         }
                     }
 
-                    // If reached here, it means the lrc file is just broken or doesn't follow the standard format. No need to fallback again since actually we can retrieve it. 
-                    isCompatibleLRCFound = true;
-                    lyricText.text = lrc_not_exists;
+                    if (!lyricFound) {
+                        isCompatibleLRCFound = true;
+                        lyricText.text = lrc_not_exists;
+                    }
                 }
             }
         };
@@ -747,6 +960,11 @@ PlasmoidItem {
         console.log(mpris2Model);
         console.log(mpris2Model.toString());
         console.log("Is wrong player: ", isWrongPlayer());
+    }
+
+    function isLightColor(colorValue) {
+        // Plasma 深色主题通常提供浅色 textColor，反之亦然。
+        return (0.2126 * colorValue.r + 0.7152 * colorValue.g + 0.0722 * colorValue.b) > 0.5;
     }
 
     function parseTime(timeString) {
@@ -818,12 +1036,20 @@ PlasmoidItem {
 
     function splayerHandler() {
         if (currentMediaArtists === "" && currentMediaTitle === "") {
-            lyricText.text = " ";
-            lyricsWTimes.clear();
+            return;
         } else {
             if (!isSPlayerLyricFound) {
                 fetchMediaInfoSP();
             }
+        }
+    }
+
+    function splayerNextHandler() {
+        if (currentMediaArtists === "" && currentMediaTitle === "") {
+            return;
+        }
+        if (!isSPlayerNextLyricFound) {
+            fetchMediaInfoSPlayerNext();
         }
     }
 
@@ -844,6 +1070,9 @@ PlasmoidItem {
         yesPlayMusicTimer.stop();
         lxMusicTimer.stop();
         splayerTimer.stop();
+        splayerNextTimer.stop();
+        favoriteStateTimer.stop();
+        favoriteRefreshTimer.stop();
         previousMediaTitle = currentMediaTitle;
         previousMediaArtists = currentMediaArtists;
         mpris2PreviousPlayerIdentity = mpris2CurrentPlayerIdentity;
@@ -852,11 +1081,19 @@ PlasmoidItem {
         prevNonEmptyLyric = "";
         previousLrcId = "";
         needFallback = false;
-        lyricText.text = " ";
+        compatibleRequestInFlight = false;
+        compatibleRequestId++;
+        splayerRequestInFlight = false;
+        splayerRequestId++;
+        splayerNextRequestInFlight = false;
+        splayerNextRequestId++;
+        favoriteRequestInFlight = false;
         isCompatibleLRCFound = false;
         isYPMLyricFound = false;
         isLXLyricFound = false;
         isSPlayerLyricFound = false;
+        isSPlayerNextLyricFound = false;
+        liked = false;
     }
 
     /**

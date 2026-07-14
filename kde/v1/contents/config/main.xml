@@ -12,6 +12,9 @@
         <entry name="splayerChecked" type="Bool">
             <default>false</default>
         </entry>
+        <entry name="splayerNextChecked" type="Bool">
+            <default>false</default>
+        </entry>
         <entry name="spotifyChecked" type="Bool">
             <default>false</default>
         </entry>
@@ -45,6 +48,9 @@
         <entry name="whiteMediaControlIconsChecked" type="Bool">
             <default>false</default>
         </entry>
+        <entry name="followSystemColorSchemeChecked" type="Bool">
+            <default>true</default>
+        </entry>
         <entry name="preferedWidgetWidth" type="String">
             <default>550</default>
         </entry>
@@ -53,6 +59,9 @@
         </entry>
         <entry name="lxMusicPort" type="Int">
             <default>23330</default>
+        </entry>
+        <entry name="splayerNextPort" type="Int">
+            <default>14558</default>
         </entry>
     </group>
 

@@ -37,10 +37,10 @@
     * Spotify
     * LX Music
     * SPlayer
+    * SPlayer-Next
     * Youtube Music
     * Netease Cloud Music (Not wine version)
     * Apple Music
-    * SPlayer
 
 * 根据歌曲信息，采用三套逻辑进行歌词抓取：  
 
@@ -63,7 +63,12 @@
      > Fetches lyrics of the currently playing music from the local port exposed by SPlayer.
      > Only builds from version 2026.1.4 onwards are available.[3eda65d](https://github.com/imsyy/SPlayer/commit/3eda65dd89fdebade373f20b5890add6ac3ab3df)
 
-  4. 全局模式 (Global Mode)
+  4. SPlayer-Next 模式 (SPlayer-Next Mode) **[SPlayer-Next](https://github.com/SPlayer-Dev/SPlayer-Next)**
+     通过本地外部 API 获取整句同步歌词，并同步当前歌曲的收藏状态。默认端口为 `14558`；需在 SPlayer-Next 的设置中开启外部 API。本仓库的收藏按钮还需要带有 `/api/favorite` 扩展的 SPlayer-Next 构建。
+
+     > Fetches line-synchronized lyrics and the current favorite state through the local external API. The default port is `14558`; enable External API in SPlayer-Next first. The favorite button also requires an SPlayer-Next build containing the `/api/favorite` extension.
+
+  5. 全局模式 (Global Mode)
      从 [**LrcLib**](https://lrclib.net/) 歌词数据库中根据 **`歌手`、`曲名`、`专辑名`** 精确匹配歌词。若无匹配结果，则使用 **歌名** 模糊查询。  
   
      > Fetches lyrics from the [Lrclib](https://lrclib.net/) lyrics database by precisely matching the `artist`, `music(track) title`, and `album name`. If no result is found, then fallback to a fuzzy search using only the **song title**. 
