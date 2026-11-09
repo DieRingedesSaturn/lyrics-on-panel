@@ -64,14 +64,19 @@
      > Only builds from version 2026.1.4 onwards are available.[3eda65d](https://github.com/imsyy/SPlayer/commit/3eda65dd89fdebade373f20b5890add6ac3ab3df)
 
   4. SPlayer-Next 模式 (SPlayer-Next Mode) **[SPlayer-Next](https://github.com/SPlayer-Dev/SPlayer-Next)**
-     通过本地外部 API 获取整句同步歌词，并同步当前歌曲的收藏状态。默认端口为 `14558`；需在 SPlayer-Next 的设置中开启外部 API。本仓库的收藏按钮还需要带有 `/api/favorite` 扩展的 SPlayer-Next 构建。
+     通过本地外部 API 的 `/api/now-playing` 快照和 `/api/lyrics` 获取整句同步歌词，并同步当前歌曲的收藏状态；同时兼容仍在快照中返回完整歌词的旧构建。默认端口为 `14558`；需在 SPlayer-Next 的设置中开启外部 API。本仓库的收藏按钮还需要带有 `/api/favorite` 扩展的 SPlayer-Next 构建。
 
-     > Fetches line-synchronized lyrics and the current favorite state through the local external API. The default port is `14558`; enable External API in SPlayer-Next first. The favorite button also requires an SPlayer-Next build containing the `/api/favorite` extension.
+     > Fetches the `/api/now-playing` snapshot and line-synchronized lyrics from `/api/lyrics`, together with the current favorite state, while remaining compatible with older builds that return full lyrics in the snapshot. The default port is `14558`; enable External API in SPlayer-Next first. The favorite button also requires an SPlayer-Next build containing the `/api/favorite` extension.
 
   5. 全局模式 (Global Mode)
      从 [**LrcLib**](https://lrclib.net/) 歌词数据库中根据 **`歌手`、`曲名`、`专辑名`** 精确匹配歌词。若无匹配结果，则使用 **歌名** 模糊查询。  
   
      > Fetches lyrics from the [Lrclib](https://lrclib.net/) lyrics database by precisely matching the `artist`, `music(track) title`, and `album name`. If no result is found, then fallback to a fuzzy search using only the **song title**. 
+
+  6. 视频字幕模式 (Video Subtitle Mode)
+     当浏览器（Firefox / Chromium 系）正在播放 YouTube 或 Bilibili 视频时，通过 MPRIS 暴露的 `xesam:url` 识别视频，直接把视频字幕当歌词显示。多个播放器同时存在时，自动选择**正在播放**的那一个；静音的浏览器会话（例如自动播放预览）会被忽略。YouTube 经由 `yt-dlp` 获取字幕（官方 timedtext 接口已需要签名），Bilibili 经由播放器接口获取。B 站的 AI 字幕需要登录，可通过环境变量 `BILI_SESSDATA` 提供 Cookie。
+
+     > When a browser session (Firefox / Chromium-based) plays a YouTube or Bilibili video, the video is recognised through the `xesam:url` exposed by MPRIS and its subtitles are shown as lyrics. When several players exist, the one that is actually **playing** wins and muted browser sessions (autoplaying previews) are ignored. YouTube subtitles come from `yt-dlp` (the plain timedtext endpoint now needs a signature), Bilibili ones from its player API. AI subtitles on Bilibili require a login; provide the cookie through the `BILI_SESSDATA` environment variable.
 
 ----
 

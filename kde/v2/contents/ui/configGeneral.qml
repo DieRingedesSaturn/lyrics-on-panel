@@ -12,6 +12,8 @@ Kirigami.FormLayout {
     property alias cfg_yesPlayMusicChecked: yesPlayMusicPropriataryRadioButton.checked 
     property alias cfg_spotifyChecked: spotifyPropriataryRadioButton.checked  
     property alias cfg_lxMusicChecked: lxMusicPropriataryRadioButton.checked   
+    property alias cfg_splayerChecked: splayerPropriataryRadioButton.checked
+    property alias cfg_splayerNextChecked: splayerNextPropriataryRadioButton.checked
     property alias cfg_compatibleModeChecked: compatibleModeRadioButton.checked
 
     property alias cfg_lyricTextSize: lyricTextSizeSpinBox.value 
@@ -25,10 +27,13 @@ Kirigami.FormLayout {
     property alias cfg_mediaControllItemSize: mediaControllItemSizeSpinBox.value
     property alias cfg_mediaControllItemVerticalOffset: mediaControllItemVerticalOffsetSpinBox.value
     property alias cfg_whiteMediaControlIconsChecked: whiteMediaControlIconsChecked.checked
+    property alias cfg_followSystemColorSchemeChecked: followSystemColorSchemeChecked.checked
+    property alias cfg_subtitleLanguage: subtitleLanguageComboBox.currentIndex
 
     property alias cfg_preferedWidgetWidth: preferedWidgetWidthTextField.text
     property alias cfg_hideItemWhenNoControlChecked: hideItemWhenNoControlChecked.checked
     property alias cfg_lxMusicPort: lxMusicPortTextField.text
+    property alias cfg_splayerNextPort: splayerNextPortTextField.text
 
     QQC2.RadioButton {
         id: yesPlayMusicPropriataryRadioButton
@@ -44,6 +49,16 @@ Kirigami.FormLayout {
     QQC2.RadioButton {
         id: lxMusicPropriataryRadioButton
         text: i18n("LX Music")
+    }
+
+    QQC2.RadioButton {
+        id: splayerPropriataryRadioButton
+        text: i18n("SPlayer")
+    }
+
+    QQC2.RadioButton {
+        id: splayerNextPropriataryRadioButton
+        text: i18n("SPlayer-Next")
     }
 
     QQC2.RadioButton {
@@ -91,6 +106,7 @@ Kirigami.FormLayout {
 
         KQControls.ColorButton {
             id: lyricTextColorButton
+            enabled: !followSystemColorSchemeChecked.checked
         }
 
         QQC2.Button {
@@ -112,10 +128,28 @@ Kirigami.FormLayout {
         }
     }
 
+    QQC2.ComboBox {
+        id: subtitleLanguageComboBox
+        Kirigami.FormData.label: i18n("Subtitle language: ")
+        model: [
+            i18n("Auto (source if Chinese/English, else Chinese)"),
+            i18n("Chinese"),
+            i18n("English")
+        ]
+        currentIndex: 0
+    }
+
+    QQC2.CheckBox {
+        id: followSystemColorSchemeChecked
+        Kirigami.FormData.label: i18n("Follow Plasma Color Scheme: ")
+        checkable: true
+    }
+
     QQC2.CheckBox {
         id: whiteMediaControlIconsChecked
         Kirigami.FormData.label: i18n("White Media Control Icons: ")
         checkable: true
+        enabled: !followSystemColorSchemeChecked.checked
     }
 
     QQC2.TextField {
@@ -133,6 +167,11 @@ Kirigami.FormLayout {
         id: lxMusicPortTextField
         Kirigami.FormData.label: i18n("LX Music Local Port: ")
         enabled: lxMusicPropriataryRadioButton.checked
+    }
+
+    QQC2.TextField {
+        id: splayerNextPortTextField
+        Kirigami.FormData.label: i18n("SPlayer-Next External API Port: ")
     }
 
     // trackName	true	string	Title of the track

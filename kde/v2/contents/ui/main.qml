@@ -6,6 +6,7 @@ import QtWebSockets
 import org.kde.plasma.core 2.0 as PlasmaCore
 import org.kde.plasma.plasmoid 2.0
 import org.kde.plasma.components 3.0 as PlasmaComponents
+import org.kde.kirigami 2.20 as Kirigami
 
 /**
  * Lyrics on Panel for KDE Plasma 6 - v2.0.0
@@ -101,7 +102,7 @@ PlasmoidItem {
             Text {
                 id: lyricText
                 text: currentLyric || lrc_not_exists
-                color: config_lyricTextColor
+                color: effectiveLyricTextColor
                 font.pixelSize: config_lyricTextSize
                 font.bold: config_lyricTextBold
                 font.italic: config_lyricTextItalic
@@ -179,15 +180,29 @@ PlasmoidItem {
 
                 MouseArea {
                     anchors.fill: parent
-                    onClicked: liked = !liked
+                    onClicked: sendControl("favorite")
                 }
             }
 
-            Image {
+            Item {
                 id: mediaPlayerIcon
-                source: config_yesPlayMusicChecked ? cloudMusicIcon : spotifyIcon
-                sourceSize.width: config_mediaControllItemSize
-                sourceSize.height: config_mediaControllItemSize
+                implicitWidth: config_mediaControllItemSize
+                implicitHeight: config_mediaControllItemSize
+
+                Image {
+                    anchors.fill: parent
+                    visible: !isBrowserPlayer
+                    source: playerIconSource
+                    sourceSize.width: config_mediaControllItemSize
+                    sourceSize.height: config_mediaControllItemSize
+                }
+
+                Kirigami.Icon {
+                    anchors.fill: parent
+                    visible: isBrowserPlayer
+                    source: "internet-web-browser"
+                    color: useWhiteMediaControlIcons ? "white" : Kirigami.Theme.textColor
+                }
 
                 MouseArea {
                     anchors.fill: parent
@@ -222,7 +237,7 @@ PlasmoidItem {
             delegate: Rectangle {
                 width: playerList.width
                 height: 36
-                color: "transparent"
+                color: delegateMouseArea.containsMouse ? Kirigami.Theme.hoverColor : "transparent"
                 radius: 4
 
                 RowLayout {
@@ -238,7 +253,7 @@ PlasmoidItem {
 
                     Text {
                         text: modelData.replace("org.mpris.MediaPlayer2.", "")
-                        color: "white"
+                        color: Kirigami.Theme.textColor
                         font.pixelSize: config_lyricTextSize
                         Layout.fillWidth: true
                     }
@@ -257,20 +272,37 @@ PlasmoidItem {
         }
     }
 
-    property string backwardIcon: config_whiteMediaControlIconsChecked ? "../assets/media-backward-white.svg" : "../assets/media-backward.svg"
-    property string pauseIcon: config_whiteMediaControlIconsChecked ? "../assets/media-pause-white.svg" : "../assets/media-pause.svg"
-    property string forwardIcon: config_whiteMediaControlIconsChecked ? "../assets/media-forward-white.svg" : "../assets/media-forward.svg"
-    property string likeIcon: config_whiteMediaControlIconsChecked ? "../assets/media-like-white.svg" : "../assets/media-like.svg"
+    property string backwardIcon: useWhiteMediaControlIcons ? "../assets/media-backward-white.svg" : "../assets/media-backward.svg"
+    property string pauseIcon: useWhiteMediaControlIcons ? "../assets/media-pause-white.svg" : "../assets/media-pause.svg"
+    property string forwardIcon: useWhiteMediaControlIcons ? "../assets/media-forward-white.svg" : "../assets/media-forward.svg"
+    property string likeIcon: useWhiteMediaControlIcons ? "../assets/media-like-white.svg" : "../assets/media-like.svg"
     property string likedIcon: "../assets/media-liked.svg"
-    property string cloudMusicIcon: config_whiteMediaControlIconsChecked ? "../assets/netease-cloud-music-white.svg" : "../assets/netease-cloud-music.svg"
-    property string spotifyIcon: config_whiteMediaControlIconsChecked ? "../assets/spotify-white.svg" : "../assets/spotify.svg"
-    property string playIcon: config_whiteMediaControlIconsChecked ? "../assets/media-play-white.svg" : "../assets/media-play.svg"
+    property string cloudMusicIcon: useWhiteMediaControlIcons ? "../assets/netease-cloud-music-white.svg" : "../assets/netease-cloud-music.svg"
+    property string spotifyIcon: useWhiteMediaControlIcons ? "../assets/spotify-white.svg" : "../assets/spotify.svg"
+    property string splayerIcon: "../assets/splayer.svg"
+    readonly property bool isBrowserPlayer: /firefox|chrome|chromium|brave|vivaldi|edge|opera/.test(currentPlayerBusName.toLowerCase())
+    readonly property string playerIconSource: {
+        if (config_yesPlayMusicChecked || currentPlayerIdentity.indexOf("YesPlayMusic") === 0) {
+            return cloudMusicIcon
+        }
+        if (config_splayerChecked || config_splayerNextChecked
+                || currentPlayerIdentity.indexOf("SPlayer") === 0) {
+            return splayerIcon
+        }
+        return spotifyIcon
+    }
+    property string playIcon: useWhiteMediaControlIcons ? "../assets/media-play-white.svg" : "../assets/media-play.svg"
     property bool liked: false
 
     property bool config_yesPlayMusicChecked: Plasmoid.configuration.yesPlayMusicChecked
     property bool config_lxMusicChecked: Plasmoid.configuration.lxMusicChecked
+    property bool config_splayerChecked: Plasmoid.configuration.splayerChecked
+    property bool config_splayerNextChecked: Plasmoid.configuration.splayerNextChecked
     property bool config_spotifyChecked: Plasmoid.configuration.spotifyChecked
     property bool config_compatibleModeChecked: Plasmoid.configuration.compatibleModeChecked
+    property bool config_followSystemColorSchemeChecked: Plasmoid.configuration.followSystemColorSchemeChecked
+    property color effectiveLyricTextColor: config_followSystemColorSchemeChecked ? Kirigami.Theme.textColor : config_lyricTextColor
+    property bool useWhiteMediaControlIcons: config_followSystemColorSchemeChecked ? isLightColor(Kirigami.Theme.textColor) : config_whiteMediaControlIconsChecked
 
     property int config_lyricTextSize: Plasmoid.configuration.lyricTextSize
     property string config_lyricTextColor: Plasmoid.configuration.lyricTextColor
@@ -288,6 +320,11 @@ PlasmoidItem {
     property bool config_hideItemWhenNoControlChecked: Plasmoid.configuration.hideItemWhenNoControlChecked
 
     property int config_lxMusicPort: Plasmoid.configuration.lxMusicPort
+    property int config_splayerNextPort: Plasmoid.configuration.splayerNextPort
+    property string config_subtitleLanguage: {
+        var modes = ["auto", "zh", "en"]
+        return modes[Plasmoid.configuration.subtitleLanguage] || "auto"
+    }
 
     readonly property string serverHost: "127.0.0.1"
     readonly property int serverPort: 23560
@@ -314,6 +351,10 @@ PlasmoidItem {
             return "org.mpris.MediaPlayer2.spotify"
         } else if (config_lxMusicChecked) {
             return "org.mpris.MediaPlayer2.lx-music-desktop"
+        } else if (config_splayerNextChecked) {
+            return "org.mpris.MediaPlayer2.splayer_next"
+        } else if (config_splayerChecked) {
+            return "org.mpris.MediaPlayer2.splayer"
         } else {
             return ""
         }
@@ -388,7 +429,11 @@ PlasmoidItem {
 
     function sendPollRequest() {
         if (pollSocket.status === WebSocket.Open) {
-            var request = { "player": requestedPlayer || null }
+            var request = {
+                "player": requestedPlayer || null,
+                "splayer_next_port": config_splayerNextPort,
+                "subtitle_language": config_subtitleLanguage
+            }
             pollSocket.sendTextMessage(JSON.stringify(request))
         }
     }
@@ -410,9 +455,15 @@ PlasmoidItem {
         }
     }
 
+    function isLightColor(colorValue) {
+        // Plasma dark themes usually hand out a light text colour, and vice versa.
+        return (0.2126 * colorValue.r + 0.7152 * colorValue.g + 0.0722 * colorValue.b) > 0.5
+    }
+
     function handlePollResponse(data) {
         if (!data || !data.player) {
             hasActivePlayer = false
+            liked = false
             currentLyric = ""
             currentTitle = ""
             currentArtist = ""
@@ -424,6 +475,7 @@ PlasmoidItem {
         hasActivePlayer = true
         playbackStatus = data.playback_status || "stopped"
         positionMs = data.position_ms || 0
+        liked = data.liked === true
 
         if (data.player) {
             currentPlayerIdentity = data.player.identity || ""
