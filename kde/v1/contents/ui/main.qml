@@ -745,25 +745,66 @@ PlasmoidItem {
             if (xhr.readyState !== XMLHttpRequest.DONE || requestId !== splayerNextRequestId) {
                 return;
             }
-            splayerNextRequestInFlight = false;
             if (requestTitle !== currentMediaTitle || requestArtists !== currentMediaArtists) {
+                splayerNextRequestInFlight = false;
                 return;
             }
             if (xhr.status === 200 && xhr.responseText) {
                 var response = JSON.parse(xhr.responseText);
                 if (!response.track || response.track.title !== requestTitle) {
+                    splayerNextRequestInFlight = false;
                     return;
-                }
-                if (response.lyric && response.lyric.length > 0) {
-                    parseSPlayerNextLyric(response.lyric);
-                } else {
-                    lyricText.text = lrc_not_exists;
-                    isSPlayerNextLyricFound = true;
                 }
                 if (typeof response.liked === "boolean") {
                     liked = response.liked;
                 }
+                if (response.lyric && response.lyric.length > 0) {
+                    splayerNextRequestInFlight = false;
+                    parseSPlayerNextLyric(response.lyric);
+                    return;
+                }
+                if (typeof response.lyricAvailable !== "boolean") {
+                    splayerNextRequestInFlight = false;
+                    lyricText.text = lrc_not_exists;
+                    isSPlayerNextLyricFound = true;
+                    return;
+                }
+                if (!response.lyricAvailable) {
+                    splayerNextRequestInFlight = false;
+                    lyricText.text = lrc_not_exists;
+                    isSPlayerNextLyricFound = true;
+                    return;
+                }
+                var trackId = response.track.id;
+                var lyricXhr = new XMLHttpRequest();
+                lyricXhr.open("GET", splayer_next_base_url + "/api/lyrics");
+                lyricXhr.onreadystatechange = function() {
+                    if (lyricXhr.readyState !== XMLHttpRequest.DONE
+                            || requestId !== splayerNextRequestId) {
+                        return;
+                    }
+                    splayerNextRequestInFlight = false;
+                    if (requestTitle !== currentMediaTitle
+                            || requestArtists !== currentMediaArtists) {
+                        return;
+                    }
+                    if (lyricXhr.status === 200 && lyricXhr.responseText) {
+                        var lyricResponse = JSON.parse(lyricXhr.responseText);
+                        if (lyricResponse.trackId !== trackId) {
+                            return;
+                        }
+                        if (lyricResponse.lyric && lyricResponse.lyric.length > 0) {
+                            parseSPlayerNextLyric(lyricResponse.lyric);
+                        } else {
+                            lyricText.text = lrc_not_exists;
+                            isSPlayerNextLyricFound = true;
+                        }
+                    }
+                };
+                lyricXhr.send();
+                return;
             }
+            splayerNextRequestInFlight = false;
         };
         xhr.send();
     }
