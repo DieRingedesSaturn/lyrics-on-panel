@@ -68,8 +68,12 @@ class LyricsServer:
                 try:
                     data = json.loads(message)
                     requested_player = data.get("player")
+                    splayer_next_port = data.get("splayer_next_port")
+                    subtitle_language = data.get("subtitle_language")
                     loop = asyncio.get_running_loop()
-                    state = await loop.run_in_executor(None, self.manager.poll_status, requested_player)
+                    state = await loop.run_in_executor(
+                        None, self.manager.poll_status, requested_player,
+                        splayer_next_port, subtitle_language)
                     await websocket.send(json.dumps(state))
                 except json.JSONDecodeError:
                     await websocket.send(json.dumps({"error": "Invalid JSON"}))
@@ -97,6 +101,11 @@ class LyricsServer:
     def _execute_control(self, action, player_name):
         """Execute playback control. Returns True on success, False on failure."""
         name = player_name or self.manager.playername
+        if not name:
+            return False
+        if action == 'favorite':
+            return self.manager.toggle_favorite(name)
+        name = self.manager.resolve_player_name(name)
         if not name:
             return False
         player = MprisPlayer(name)

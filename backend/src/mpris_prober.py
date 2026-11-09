@@ -1,5 +1,6 @@
 import dbus
 import re
+
 from mpris_player import PlaybackStatus, get_session_bus
 
 def find_players():
@@ -39,4 +40,38 @@ def find_playing_players(playernames=None):
         except dbus.exceptions.DBusException:
             continue
     return playing_playernames
+
+def probe_players(playernames=None):
+    """
+    Snapshot every MPRIS player in a single GetAll call per player.
+
+    Returns a list of dicts with the fields the multi-player selection needs:
+    name, playing, volume, muted, url and title.
+    """
+    bus = get_session_bus()
+    if playernames is None:
+        playernames = find_players()
+    players = []
+    for playername in playernames:
+        try:
+            dbusobj = bus.get_object(playername, '/org/mpris/MediaPlayer2')
+            props_iface = dbus.Interface(dbusobj, 'org.freedesktop.DBus.Properties')
+            data = props_iface.GetAll('org.mpris.MediaPlayer2.Player')
+        except dbus.exceptions.DBusException:
+            continue
+        metadata = data.get('Metadata') or {}
+        try:
+            volume = float(data.get('Volume', 1.0))
+        except (TypeError, ValueError):
+            volume = 1.0
+        players.append({
+            'name': playername,
+            'playing': str(data.get('PlaybackStatus', '')).lower() == PlaybackStatus.PLAYING.value.lower(),
+            'volume': volume,
+            'muted': volume <= 0.0,
+            'url': str(metadata.get('xesam:url', '')),
+            'title': str(metadata.get('xesam:title', '')),
+        })
+    return players
+
 
